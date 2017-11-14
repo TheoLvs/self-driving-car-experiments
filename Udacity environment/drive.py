@@ -50,6 +50,24 @@ controller = SimplePIController(0.1, 0.002)
 set_speed = 9
 controller.set_desired(set_speed)
 
+def load_model(h5_path,json_path):
+    from keras.models import model_from_json
+    model = model_from_json(open(json_path,"r").read())
+    model.load_weights(h5_path)
+    return model
+
+
+def convert(img):
+    img = np.array(img)
+    img = np.divide(img,255)
+    img = np.expand_dims(img,axis = 0)
+    return img
+
+
+dl = True
+
+if dl:
+    model = load_model("weights.h5","architecture.json")
 
 @sio.on('telemetry')
 def telemetry(sid, data):
@@ -65,19 +83,28 @@ def telemetry(sid, data):
         imgString = data["image"]
         image = Image.open(BytesIO(base64.b64decode(imgString)))
 
-        img = CameraImage(image)
-        steering_angle = img.act() / 2
+        if dl:
+            img = convert(image)
+            controls = model.predict(img)
+            steering_angle,speed,throttle,brake = controls[0]
+            # throttle = controller.update(float(speed))
+            # cv2.imshow('window', np.array(image))
+        else:
 
-        img_detected = to_black_and_white(img.original_array)
-        img_detected = detect_edges(img_detected,300,600)
+            img = CameraImage(image)
+            steering_angle = img.act() / 2
+
+            img_detected = to_black_and_white(img.original_array)
+            img_detected = detect_edges(img_detected,300,600)
+            throttle = controller.update(float(speed)) if np.abs(steering_angle) > 10 else controller.update(float(speed)) * 1.5
         # cv2.imshow("window",img.array)
 
             # screen =  np.array(ImageGrab.grab(bbox=(0,40,800,640)))
             # #print('Frame took {} seconds'.format(time.time()-last_time))
             # last_time = time.time()
             # new_screen = process_img(screen)
-        cv2.imshow('window', img.array)
-        cv2.imshow('edges',img_detected)
+            cv2.imshow('edges',img_detected)
+            cv2.imshow('window', img.array)
             #cv2.imshow('window',cv2.cvtColor(screen, cv2.COLOR_BGR2RGB))
         if cv2.waitKey(25) & 0xFF == ord('q'):
             cv2.destroyAllWindows()
@@ -87,7 +114,6 @@ def telemetry(sid, data):
 
         # speed = float(speed) * 2 if np.abs(steering_angle) > 10 else float(speed)
         # throttle = controller.update(float(speed))
-        throttle = controller.update(float(speed)) if np.abs(steering_angle) > 10 else controller.update(float(speed)) * 1.5
 
 
         print(steering_angle, throttle,"- speed :",speed)
