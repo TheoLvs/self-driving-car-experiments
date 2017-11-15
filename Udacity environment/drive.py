@@ -87,6 +87,7 @@ def telemetry(sid, data):
             img = convert(image)
             controls = model.predict(img)
             steering_angle,speed,throttle,brake = controls[0]
+            speed = 10
             # throttle = controller.update(float(speed))
             # cv2.imshow('window', np.array(image))
         else:
